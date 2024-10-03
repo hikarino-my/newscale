@@ -5,7 +5,6 @@ const bufferLength = analyser.frequencyBinCount; // Half of fftSize
 const dataArray = new Uint8Array(bufferLength); // Array to hold time-domain data
 analyser.connect(audioContext.destination);
 
-
 class Synth {
   keyCode;
   volume = 0.1;
@@ -17,9 +16,10 @@ class Synth {
   dataArray;
   constructor({ keyCode, pars, type }) {
     //  "sine", "square", "sawtooth", "triangle"
-    if (type == "sawtooth"){
-      type = "sine"
+    if (type == "sawtooth") {
+      type = "sine";
     }
+    type = "sine";
     this.type = type;
     this.pars = pars;
     this.keyCode = keyCode;
@@ -27,15 +27,12 @@ class Synth {
   createOs() {
     this.hz = (current_hz * this.pars[0]) / this.pars[1];
     current_hz = this.hz;
-    if (this.oscillator){
+    if (this.oscillator) {
       this.oscillator.disconnect();
     }
     this.oscillator = audioContext.createOscillator();
     this.oscillator.type = this.type;
-    this.oscillator.frequency.setValueAtTime(
-      this.hz,
-      audioContext.currentTime
-    );
+    this.oscillator.frequency.setValueAtTime(this.hz, audioContext.currentTime);
     this.oscillator.connect(this.gainNode);
     this.oscillator.start(0);
   }
@@ -62,6 +59,9 @@ class Synth {
         this.createOs();
       }
       console.log(code, "down", this.hz);
+      const hz_view = document.getElementById("hz");
+      hz_view.textContent =
+        hz_view.textContent.trim() + " " + this.hz.toFixed(3);
     }
     this.stopped = false;
   }
@@ -78,60 +78,103 @@ class Synth {
       );
       this.oscillator.stop(audioContext.currentTime + 1);
       this.stopped = true;
+      const hz_view = document.getElementById("hz");
+      const keep_hzs = [];
+      const playing_hzs = hz_view.textContent
+        .trim()
+        .split(" ")
+        .map((v) => v.trim());
+      let flag = true;
+      for (let v of playing_hzs) {
+        if (flag && v === this.hz.toFixed(3)) {
+          flag = false;
+          continue;
+        }
+        keep_hzs.push(v);
+      }
+      hz_view.textContent = keep_hzs.join(" ");
     }
   }
 }
 let current_hz = 440;
 const fps = 60;
 let now = 0;
-drawWaveform();
 
 function drawWaveform() {
-  const canvas = document.getElementById('waveformCanvas');
-  const canvasCtx = canvas.getContext('2d');
+  const canvas = document.getElementById("waveformCanvas");
+  const canvasCtx = canvas.getContext("2d");
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
 
   function draw() {
     const timestamp = new Date();
     const delta = Math.floor(timestamp - now);
-
     requestAnimationFrame(draw); // Call draw at the next animation frame
-
     if (delta < 60) {
       return;
     }
     now = timestamp;
-    analyser.getByteTimeDomainData(dataArray); // Get waveform data
-
-    // Clear the canvas before drawing
+    analyser.getByteTimeDomainData(dataArray);
     canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Set line styles
     canvasCtx.lineWidth = 2;
-    canvasCtx.strokeStyle = 'rgb(0, 0, 0)';
-
-    // Begin drawing
+    canvasCtx.strokeStyle = "rgb(0, 0, 0)";
     canvasCtx.beginPath();
     const sliceWidth = canvas.width / bufferLength;
     let x = 0;
-
     for (let i = 0; i < bufferLength; i++) {
       const v = dataArray[i] / 128.0; // Normalize the data
       const y = (v * canvas.height) / 2;
-
       if (i === 0) {
         canvasCtx.moveTo(x, y);
       } else {
         canvasCtx.lineTo(x, y);
       }
-
       x += sliceWidth;
     }
-
     canvasCtx.lineTo(canvas.width, canvas.height / 2);
     canvasCtx.stroke(); // Draw the waveform
   }
+  draw();
+}
 
-  draw(); // Start the drawing loop
+function drawScale() {
+  const canvas = document.getElementById("scale-bar");
+  const canvasCtx = canvas.getContext("2d");
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+
+  function draw() {
+    const timestamp = new Date();
+    const delta = Math.floor(timestamp - now);
+    requestAnimationFrame(draw); // Call draw at the next animation frame
+    canvasCtx.strokeStyle = "#333"; // 塗りつぶしは暗めの色
+    canvasCtx.fillStyle = "#f00"; // 線は赤色
+    canvasCtx.lineWidth = 5; // 線の幅は5px
+    canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+    canvasCtx.beginPath();
+    const octwidth = canvas.width / 7;
+    const keywidth = octwidth / 12;
+    const A440 = octwidth * 3 + keywidth * 9.5;
+    const target = syns
+      .filter((s) => !s.stopped)
+      .map((s) => s.hz)
+      .map((v) => Math.log2(v / 440))
+      .map((v) => v * octwidth + A440)
+      .forEach((v) => {
+        // const x = octwidth * 3 + keywidth * 9.5; // x 座標
+        const y = (canvas.height * 2) / 3; // y 座標
+        canvasCtx.arc(v, y, 5, 0, 2 * Math.PI);
+        canvasCtx.closePath();
+        canvasCtx.fill();
+      });
+    //console.log(x, target[0]);
+    //canvasCtx.lineWidth = 2;
+    //canvasCtx.strokeStyle = "rgb(0, 0, 0)";
+    //canvasCtx.beginPath();
+    //canvasCtx.lineTo(canvas.width, canvas.height / 2);
+    //canvasCtx.stroke(); // Draw the waveform
+  }
+  draw();
 }
 /*
 A (ラ) = 440Hz
@@ -220,12 +263,15 @@ let stared = false;
 window.addEventListener("keydown", (event) => {
   //event.preventDefault()
   if (stared) {
-    for (var syn of syns) {
+    for (let syn of syns) {
       if (event.code === syn.keyCode) {
         syn.playSound(event.code);
         break;
       }
-    }  
+    }
+    if (event.code === "Space") {
+      current_hz = 440;
+    }
   } else {
     if (event.code === "Space") {
       audioContext.resume();
@@ -236,10 +282,24 @@ window.addEventListener("keydown", (event) => {
 });
 window.addEventListener("keyup", (event) => {
   //event.preventDefault()
-  for (var syn of syns) {
+  for (let syn of syns) {
     if (event.code === syn.keyCode) {
       syn.stopSound();
       break;
     }
   }
 });
+
+window.addEventListener("DOMContentLoaded", () => {
+  drawWaveform();
+  drawScale();
+});
+window.onresize = () => {
+  [
+    document.getElementById("waveformCanvas"),
+    document.getElementById("scale-bar"),
+  ].forEach((canvas) => {
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+  });
+};
