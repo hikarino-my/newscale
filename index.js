@@ -1,8 +1,6 @@
 const audioContext = new AudioContext();
 const analyser = audioContext.createAnalyser();
 analyser.fftSize = 512; // Set FFT size (higher means more detailed waveform)
-const bufferLength = analyser.frequencyBinCount; // Half of fftSize
-const dataArray = new Uint8Array(bufferLength); // Array to hold time-domain data
 analyser.connect(audioContext.destination);
 
 class Synth {
@@ -107,7 +105,6 @@ class Synth {
   }
 }
 let current_hz = 440;
-const fps = 60;
 let now = 0;
 
 function drawWaveform() {
@@ -115,6 +112,8 @@ function drawWaveform() {
   const canvasCtx = canvas.getContext("2d");
   canvas.width = canvas.clientWidth;
   canvas.height = canvas.clientHeight;
+  const bufferLength = analyser.frequencyBinCount; // Half of fftSize
+  const dataArray = new Uint8Array(bufferLength); // Array to hold time-domain data
 
   function draw() {
     const timestamp = new Date();
@@ -129,11 +128,13 @@ function drawWaveform() {
     canvasCtx.lineWidth = 2;
     canvasCtx.strokeStyle = "rgb(0, 0, 0)";
     canvasCtx.beginPath();
+    const baseline = canvas.height;
+    const shift = baseline / 2;
     const sliceWidth = canvas.width / bufferLength;
     let x = 0;
     for (let i = 0; i < bufferLength; i++) {
       const v = dataArray[i] / 128.0; // Normalize the data
-      const y = (v * canvas.height) / 2;
+      const y = v * baseline - shift;
       if (i === 0) {
         canvasCtx.moveTo(x, y);
       } else {
@@ -141,7 +142,7 @@ function drawWaveform() {
       }
       x += sliceWidth;
     }
-    canvasCtx.lineTo(canvas.width, canvas.height / 2);
+    canvasCtx.lineTo(canvas.width, baseline - shift);
     canvasCtx.stroke(); // Draw the waveform
   }
   draw();
@@ -168,7 +169,7 @@ function drawScale() {
         canvasCtx.fillText(
           syn.label,
           calcPlace(syn.nextHz),
-          canvas.height - 20 - (canvas.height * i*1.8) / 100
+          canvas.height - 20 - (canvas.height * i * 1.8) / 100
         );
       });
     canvasCtx.strokeStyle = "#333"; // 塗りつぶしは暗めの色
@@ -259,8 +260,10 @@ const syns = Object.entries(tar).map(
     new Synth({ type: "sine", label, pars, keyCode })
 );
 let started = false;
-
-window.addEventListener("keydown", (event) => {
+async function timeout(msec) {
+  await new Promise((resolve) => setTimeout(resolve, msec));
+}
+window.addEventListener("keydown", async (event) => {
   //event.preventDefault()
   if (started) {
     for (let syn of syns) {
@@ -292,8 +295,79 @@ window.addEventListener("keydown", (event) => {
         syn.playSound("initialize");
         setTimeout(() => initialize(syn), 100);
       };
-      initialize(syns[6]);
-      // syn.playSound(event.code);
+      const base_du = 500;
+      const sp = 100;
+      const intro1 = async () => {
+        current_hz = 440;
+        syns[24].playSound();
+        syns[1].playSound();
+        await timeout(base_du * 1.5);
+        syns[1].stopSound();
+        syns[6].playSound();
+        await timeout(base_du / 2 - sp);
+        syns[6].stopSound();
+        await timeout(sp);
+        syns[0].playSound();
+        await timeout(base_du * 2);
+        syns[0].stopSound();
+        ///
+        syns[30].playSound();
+        await timeout(base_du * 1.5);
+        syns[30].stopSound();
+        syns[41].playSound();
+        await timeout(base_du / 2 - sp);
+        syns[41].stopSound();
+        await timeout(sp);
+        syns[41].playSound();
+        await timeout(base_du * 2);
+        syns[41].stopSound();
+        syns[24].stopSound();
+      };
+      await intro1();
+      syns[29].playSound();
+      syns[1].playSound();
+      await timeout(base_du * 1.5);
+      syns[1].stopSound();
+      syns[12].playSound();
+      await timeout(base_du / 2);
+      syns[12].stopSound();
+      syns[6].playSound();
+      await timeout(base_du * 1.5);
+      syns[6].stopSound();
+      syns[30].playSound();
+      await timeout(base_du / 2);
+      syns[30].stopSound();
+      syns[41].playSound();
+      await timeout(base_du * 3);
+      syns[41].stopSound();
+      await timeout(base_du);
+      syns[29].stopSound();
+      //
+      await intro1();
+      //
+      syns[29].playSound();
+      syns[1].playSound();
+      await timeout(base_du * 1);
+      syns[1].stopSound();
+      syns[12].playSound();
+      await timeout(base_du);
+      syns[12].stopSound();
+      syns[29].stopSound();
+
+      syns[41].playSound();
+      syns[41].stopSound();
+      syns[24].playSound();
+      syns[1].playSound();
+      await timeout(base_du * 1.5);
+      syns[1].stopSound();
+      syns[35].playSound();
+      await timeout(base_du * 0.5);
+      syns[24].stopSound();
+      syns[35].stopSound();
+      syns[0].playSound();
+      await timeout(base_du * 4);
+      syns[0].stopSound();
+      current_hz = 440;
     }
   }
 });
