@@ -12,19 +12,32 @@ class Synth {
   hz = 440;
   type = "sine";
   pars = [1, 1];
-  dataArray;
-  constructor({ keyCode, pars, type }) {
+  label = "";
+  constructor({ keyCode, pars, type, label }) {
     //  "sine", "square", "sawtooth", "triangle"
     if (type == "sawtooth") {
       type = "sine";
     }
     type = "triangle";
     this.type = type;
+    this.label = label;
     this.pars = pars;
     this.keyCode = keyCode;
   }
+
+  get dist() {
+    return this.pars[0] > this.pars[1]
+      ? this.pars[0] / this.pars[1]
+      : this.pars[1] / this.pars[0];
+  }
+  get ratio() {
+    return this.pars[0] / this.pars[1];
+  }
+  get nextHz() {
+    return current_hz * this.ratio;
+  }
   createOs() {
-    this.hz = (current_hz * this.pars[0]) / this.pars[1];
+    this.hz = this.nextHz;
     current_hz = this.hz;
     if (this.oscillator) {
       this.oscillator.disconnect();
@@ -141,22 +154,33 @@ function drawScale() {
   canvas.height = canvas.clientHeight;
   function draw() {
     requestAnimationFrame(draw); // Call draw at the next animation frame
-    canvasCtx.strokeStyle = "#333"; // 塗りつぶしは暗めの色
-    canvasCtx.fillStyle = "#f00"; // 線は赤色
-    canvasCtx.lineWidth = 5; // 線の幅は5px
-    canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
     const octwidth = canvas.width / 7;
     const keywidth = octwidth / 12;
     const A440 = octwidth * 3 + keywidth * 9.5;
+    const calcPlace = (hz) => Math.log2(hz / 440) * octwidth + A440;
+    canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+    canvasCtx.fillStyle = "black"; // 線は赤色
+    canvasCtx.font = "14px bold";
+    canvasCtx.textAlign = "center";
+    syns
+      .toSorted((a, b) => Math.sign(a.dist - b.dist))
+      .forEach((syn, i) => {
+        canvasCtx.fillText(
+          syn.label,
+          calcPlace(syn.nextHz),
+          canvas.height - 20 - (canvas.height * i*1.8) / 100
+        );
+      });
+    canvasCtx.strokeStyle = "#333"; // 塗りつぶしは暗めの色
+    canvasCtx.fillStyle = "#f00"; // 線は赤色
+    canvasCtx.lineWidth = 5; // 線の幅は5px
     syns
       .filter((s) => !s.stopped)
-      .map((s) => s.hz)
-      .map((v) => Math.log2(v / 440))
-      .map((v) => v * octwidth + A440)
+      .map((s) => calcPlace(s.hz))
       .forEach((v) => {
         canvasCtx.beginPath();
         // const x = octwidth * 3 + keywidth * 9.5; // x 座標
-        const y = (canvas.height * 2) / 3; // y 座標
+        const y = (canvas.height * 98) / 100; // y 座標
         canvasCtx.arc(v, y, 5, 0, 2 * Math.PI);
         canvasCtx.closePath();
         canvasCtx.fill();
@@ -182,56 +206,57 @@ const syn1 = new Synth({hz: ref * Math.pow(2,   (-9/12)), keyCode: "Digit1"})
 const ref = 440;
 const type = "triangle"; // "sine", "square", "sawtooth", "triangle"
 const tar = {
-  Digit1: [1, 1],
-  Digit2: [2, 1],
-  Digit3: [3, 2],
-  Digit4: [4, 3],
-  Digit5: [5, 4],
-  Digit6: [5, 3],
-  Digit7: [6, 5],
-  Digit8: [7, 6],
-  Digit9: [7, 5],
-  Digit0: [7, 4],
-  Minus: [8, 7],
-  Equal: [8, 5],
-  IntlYen: [9, 8],
-  KeyQ: [9, 7],
-  KeyW: [9, 5],
-  KeyE: [10, 9],
-  KeyR: [10, 7],
-  KeyT: [11, 10],
-  KeyY: [11, 9],
-  KeyU: [11, 8],
-  KeyI: [11, 7],
-  KeyO: [11, 6],
-  KeyP: [12, 11],
-  BracketLeft: [12, 7],
-  BracketRight: [1, 2],
-  KeyA: [2, 3],
-  KeyS: [3, 4],
-  KeyD: [3, 5],
-  KeyF: [4, 5],
-  KeyG: [4, 7],
-  KeyH: [5, 6],
-  KeyJ: [5, 7],
-  KeyK: [5, 8],
-  KeyL: [5, 9],
-  Semicolon: [6, 7],
-  Quote: [7, 8],
-  Backslash: [7, 9],
-  KeyZ: [7, 10],
-  KeyX: [7, 11],
-  KeyC: [7, 12],
-  KeyV: [7, 13],
-  KeyB: [8, 9],
-  KeyN: [8, 11],
-  KeyM: [8, 13],
-  Comma: [9, 10],
-  Period: [9, 11],
-  Slash: [9, 13],
+  Digit1: ["1", [1, 1]],
+  Digit2: ["2", [2, 1]],
+  Digit3: ["3", [3, 2]],
+  Digit4: ["4", [4, 3]],
+  Digit5: ["5", [5, 4]],
+  Digit6: ["6", [5, 3]],
+  Digit7: ["7", [6, 5]],
+  Digit8: ["8", [7, 6]],
+  Digit9: ["9", [7, 5]],
+  Digit0: ["0", [7, 4]],
+  Minus: ["-", [8, 7]],
+  Equal: ["^", [8, 5]],
+  IntlYen: ["\\", [9, 8]],
+  KeyQ: ["q", [9, 7]],
+  KeyW: ["w", [9, 5]],
+  KeyE: ["e", [10, 9]],
+  KeyR: ["r", [10, 7]],
+  KeyT: ["t", [11, 10]],
+  KeyY: ["y", [11, 9]],
+  KeyU: ["u", [11, 8]],
+  KeyI: ["i", [11, 7]],
+  KeyO: ["o", [11, 6]],
+  KeyP: ["p", [12, 11]],
+  BracketLeft: ["@", [12, 7]],
+  BracketRight: ["[", [1, 2]],
+  KeyA: ["a", [2, 3]],
+  KeyS: ["s", [3, 4]],
+  KeyD: ["d", [3, 5]],
+  KeyF: ["f", [4, 5]],
+  KeyG: ["g", [4, 7]],
+  KeyH: ["h", [5, 6]],
+  KeyJ: ["j", [5, 7]],
+  KeyK: ["k", [5, 8]],
+  KeyL: ["l", [5, 9]],
+  Semicolon: [";", [6, 7]],
+  Quote: [":", [7, 8]],
+  Backslash: ["]", [7, 9]],
+  KeyZ: ["z", [7, 10]],
+  KeyX: ["x", [7, 11]],
+  KeyC: ["c", [7, 12]],
+  KeyV: ["v", [7, 13]],
+  KeyB: ["b", [8, 9]],
+  KeyN: ["n", [8, 11]],
+  KeyM: ["m", [8, 13]],
+  Comma: [",", [9, 10]],
+  Period: [".", [9, 11]],
+  Slash: ["/", [9, 13]],
 };
 const syns = Object.entries(tar).map(
-  ([keyCode, pars]) => new Synth({ type: "sine", pars, keyCode })
+  ([keyCode, [label, pars]]) =>
+    new Synth({ type: "sine", label, pars, keyCode })
 );
 let started = false;
 
@@ -288,7 +313,7 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 window.onresize = () => {
   ["waveformCanvas", "scale-bar"]
-    .map(document.getElementById)
+    .map((e) => document.getElementById(e))
     .forEach(
       (canvas) =>
         ([canvas.width, canvas.height] = [
